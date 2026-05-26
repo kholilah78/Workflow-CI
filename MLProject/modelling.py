@@ -198,7 +198,10 @@ def main():
         mlflow.set_tag('author',  'Kholilah Nurafifah')
         mlflow.set_tag('dataset', 'Heart Disease UCI')
 
+        # Simpan run_id ke file
         run_id = mlflow.active_run().info.run_id
+        with open('../last_run_id.txt', 'w') as f:
+            f.write(run_id)
         print(f"\n[MLflow] Run ID: {run_id}")
         print("[CI] Training selesai!")
 
