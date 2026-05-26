@@ -129,9 +129,6 @@ def main():
         TRAIN_PATH, TEST_PATH, TARGET_COL
     )
 
-    mlflow.set_tracking_uri(os.environ.get('MLFLOW_TRACKING_URI', 'mlruns'))
-    mlflow.set_experiment(EXPERIMENT_NAME)
-
     with mlflow.start_run():
 
         # Log params
