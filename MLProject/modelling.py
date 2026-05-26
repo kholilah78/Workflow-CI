@@ -36,7 +36,7 @@ warnings.filterwarnings('ignore')
 TRAIN_PATH      = os.path.join('heart_preprocessing', 'heart_train.csv')
 TEST_PATH       = os.path.join('heart_preprocessing', 'heart_test.csv')
 TARGET_COL      = 'target'
-EXPERIMENT_NAME = 'Heart_Disease_CI_Pipeline'
+EXPERIMENT_NAME = 'Heart_Disease_CI_Pipeline_v2'
 ARTIFACTS_DIR   = 'artifacts'
 os.makedirs(ARTIFACTS_DIR, exist_ok=True)
 
