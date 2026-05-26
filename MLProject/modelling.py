@@ -2,7 +2,6 @@
 modelling.py (MLProject version)
 ==================================
 Script training yang digunakan dalam MLflow Project (Kriteria 3).
-Mendukung parameter via argparse agar bisa dipanggil oleh MLProject.
 
 Author  : Kholilah Nurafifah
 Dataset : Heart Disease UCI
@@ -10,7 +9,6 @@ Dataset : Heart Disease UCI
 
 import os
 import argparse
-import json
 import mlflow
 import mlflow.sklearn
 import pandas as pd
@@ -43,16 +41,16 @@ os.makedirs(ARTIFACTS_DIR, exist_ok=True)
 
 
 # ─────────────────────────────────────────────
-# ARGPARSE
+# ARGPARSE — positional args (tanpa --)
 # ─────────────────────────────────────────────
 def parse_args():
     parser = argparse.ArgumentParser(description='Heart Disease Model Training')
-    parser.add_argument('--n_estimators',      type=int,   default=100)
-    parser.add_argument('--max_depth',         type=float, default=0,
-                        help='0 berarti None (tidak dibatasi)')
-    parser.add_argument('--min_samples_split', type=int,   default=2)
-    parser.add_argument('--min_samples_leaf',  type=int,   default=1)
-    parser.add_argument('--random_state',      type=int,   default=42)
+    parser.add_argument('n_estimators',       type=int,   nargs='?', default=100)
+    parser.add_argument('max_depth',          type=float, nargs='?', default=0,
+                        help='0 berarti None')
+    parser.add_argument('min_samples_split',  type=int,   nargs='?', default=2)
+    parser.add_argument('min_samples_leaf',   type=int,   nargs='?', default=1)
+    parser.add_argument('random_state',       type=int,   nargs='?', default=42)
     return parser.parse_args()
 
 
@@ -87,8 +85,7 @@ def plot_confusion_matrix(y_true, y_pred, path):
 def plot_roc_curve(y_true, y_proba, roc_auc, path):
     fpr, tpr, _ = roc_curve(y_true, y_proba)
     fig, ax = plt.subplots(figsize=(6, 5))
-    ax.plot(fpr, tpr, color='#2196F3', lw=2,
-            label=f'AUC = {roc_auc:.4f}')
+    ax.plot(fpr, tpr, color='#2196F3', lw=2, label=f'AUC = {roc_auc:.4f}')
     ax.plot([0, 1], [0, 1], 'k--', lw=1)
     ax.set_xlabel('False Positive Rate')
     ax.set_ylabel('True Positive Rate')
@@ -134,26 +131,27 @@ def main():
     mlflow.set_tracking_uri(os.environ.get('MLFLOW_TRACKING_URI', 'mlruns'))
     mlflow.set_experiment(EXPERIMENT_NAME)
 
+    # Pastikan tidak ada run yang masih aktif
+    if mlflow.active_run():
+        mlflow.end_run()
+
     with mlflow.start_run(run_name='RandomForest_CI'):
 
         # Log params
-        params = {
-            'n_estimators'    : args.n_estimators,
-            'max_depth'       : str(max_depth),
-            'min_samples_split': args.min_samples_split,
-            'min_samples_leaf' : args.min_samples_leaf,
-            'random_state'    : args.random_state,
-        }
-        mlflow.log_params(params)
+        mlflow.log_param('n_estimators',      args.n_estimators)
+        mlflow.log_param('max_depth',         str(max_depth))
+        mlflow.log_param('min_samples_split', args.min_samples_split)
+        mlflow.log_param('min_samples_leaf',  args.min_samples_leaf)
+        mlflow.log_param('random_state',      args.random_state)
 
         # Training
         model = RandomForestClassifier(
-            n_estimators     = args.n_estimators,
-            max_depth        = max_depth,
-            min_samples_split= args.min_samples_split,
-            min_samples_leaf = args.min_samples_leaf,
-            random_state     = args.random_state,
-            n_jobs           = -1
+            n_estimators      = args.n_estimators,
+            max_depth         = max_depth,
+            min_samples_split = args.min_samples_split,
+            min_samples_leaf  = args.min_samples_leaf,
+            random_state      = args.random_state,
+            n_jobs            = -1
         )
         model.fit(X_train, y_train)
 
@@ -169,41 +167,44 @@ def main():
         cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring='f1')
 
         # Log metrics
-        mlflow.log_metric('accuracy',    acc)
-        mlflow.log_metric('precision',   precision)
-        mlflow.log_metric('recall',      recall)
-        mlflow.log_metric('f1_score',    f1)
-        mlflow.log_metric('roc_auc',     roc_auc)
-        mlflow.log_metric('cv_f1_mean',  cv_scores.mean())
-        mlflow.log_metric('cv_f1_std',   cv_scores.std())
+        mlflow.log_metric('accuracy',   acc)
+        mlflow.log_metric('precision',  precision)
+        mlflow.log_metric('recall',     recall)
+        mlflow.log_metric('f1_score',   f1)
+        mlflow.log_metric('roc_auc',    roc_auc)
+        mlflow.log_metric('cv_f1_mean', cv_scores.mean())
+        mlflow.log_metric('cv_f1_std',  cv_scores.std())
 
         print(f"\nAccuracy : {acc:.4f}")
         print(f"F1-Score : {f1:.4f}")
         print(f"ROC-AUC  : {roc_auc:.4f}")
 
         # Log model
-        mlflow.sklearn.log_model(model, 'model',
-                                 registered_model_name='HeartDiseaseClassifier')
+        mlflow.sklearn.log_model(
+            model, 'model',
+            registered_model_name='HeartDiseaseClassifier'
+        )
 
         # Artefak tambahan
-        cm_path = os.path.join(ARTIFACTS_DIR, 'confusion_matrix.png')
-        roc_path = os.path.join(ARTIFACTS_DIR, 'roc_curve.png')
-        fi_path  = os.path.join(ARTIFACTS_DIR, 'feature_importance.png')
+        cm_path     = os.path.join(ARTIFACTS_DIR, 'confusion_matrix.png')
+        roc_path    = os.path.join(ARTIFACTS_DIR, 'roc_curve.png')
+        fi_path     = os.path.join(ARTIFACTS_DIR, 'feature_importance.png')
         report_path = os.path.join(ARTIFACTS_DIR, 'classification_report.txt')
 
         plot_confusion_matrix(y_test, y_pred, cm_path)
         plot_roc_curve(y_test, y_proba, roc_auc, roc_path)
         plot_feature_importance(model, list(X_train.columns), fi_path)
 
-        report = classification_report(y_test, y_pred,
-                                       target_names=['No Disease', 'Disease'])
+        report = classification_report(
+            y_test, y_pred, target_names=['No Disease', 'Disease']
+        )
         with open(report_path, 'w') as f:
             f.write(report)
 
-        mlflow.log_artifact(cm_path,      'plots')
-        mlflow.log_artifact(roc_path,     'plots')
-        mlflow.log_artifact(fi_path,      'plots')
-        mlflow.log_artifact(report_path,  'reports')
+        mlflow.log_artifact(cm_path,     'plots')
+        mlflow.log_artifact(roc_path,    'plots')
+        mlflow.log_artifact(fi_path,     'plots')
+        mlflow.log_artifact(report_path, 'reports')
 
         mlflow.set_tag('author',  'Kholilah Nurafifah')
         mlflow.set_tag('dataset', 'Heart Disease UCI')
