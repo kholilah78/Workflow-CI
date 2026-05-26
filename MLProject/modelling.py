@@ -17,6 +17,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
+import uuid
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -135,7 +136,7 @@ def main():
     if mlflow.active_run():
         mlflow.end_run()
 
-    with mlflow.start_run(run_name='RandomForest_CI'):
+    with mlflow.start_run(run_name=f'RandomForest_CI_{uuid.uuid4().hex[:8]}'):
 
         # Log params
         mlflow.log_param('n_estimators',      args.n_estimators)
