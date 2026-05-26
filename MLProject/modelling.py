@@ -132,8 +132,6 @@ def main():
     with mlflow.start_run():
 
         # Log params
-        mlflow.log_param('n_estimators',      args.n_estimators)
-        mlflow.log_param('max_depth', str(args.max_depth))
         mlflow.log_param('min_samples_split', args.min_samples_split)
         mlflow.log_param('min_samples_leaf',  args.min_samples_leaf)
         mlflow.log_param('random_state',      args.random_state)
