@@ -172,10 +172,7 @@ def main():
         print(f"ROC-AUC  : {roc_auc:.4f}")
 
         # Log model
-        mlflow.sklearn.log_model(
-            model, 'model',
-            registered_model_name='HeartDiseaseClassifier'
-        )
+        mlflow.sklearn.log_model(model, 'model')
 
         # Artefak tambahan
         cm_path     = os.path.join(ARTIFACTS_DIR, 'confusion_matrix.png')
