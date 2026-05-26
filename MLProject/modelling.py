@@ -132,11 +132,7 @@ def main():
     mlflow.set_tracking_uri(os.environ.get('MLFLOW_TRACKING_URI', 'mlruns'))
     mlflow.set_experiment(EXPERIMENT_NAME)
 
-    # Pastikan tidak ada run yang masih aktif
-    if mlflow.active_run():
-        mlflow.end_run()
-
-    with mlflow.start_run(run_name=f'RandomForest_CI_{uuid.uuid4().hex[:8]}'):
+    with mlflow.start_run():
 
         # Log params
         mlflow.log_param('n_estimators',      args.n_estimators)
