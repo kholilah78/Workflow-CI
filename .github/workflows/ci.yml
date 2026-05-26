@@ -1,0 +1,112 @@
+name: CI - MLflow Training Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'MLProject/**'
+  workflow_dispatch:
+
+env:
+  DOCKER_IMAGE: kholilah-nurafifah/heart-disease-mlflow
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+  MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+
+jobs:
+  train:
+    name: Train Model via MLflow Project
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ─────────────────────────────────
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ── 2. Setup Python ──────────────────────────────
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.7'
+          cache: 'pip'
+
+      # ── 3. Install dependencies ───────────────────────
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install mlflow==2.19.0 scikit-learn==1.5.2 \
+                      pandas==2.2.3 numpy==1.26.4 \
+                      matplotlib==3.9.2 seaborn==0.13.2 \
+                      dagshub==0.3.40
+
+      # ── 4. Run MLflow Project ─────────────────────────
+      - name: Run MLflow Project
+        run: |
+          mlflow run MLProject \
+            -P n_estimators=100 \
+            -P max_depth=0 \
+            -P min_samples_split=2 \
+            -P min_samples_leaf=1 \
+            --env-manager=local \
+            --experiment-name "Heart_Disease_CI_Pipeline"
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+
+      # ── 5. Collect artifacts ──────────────────────────
+      - name: Collect Artifacts
+        run: |
+          mkdir -p ci_artifacts
+          cp -r MLProject/artifacts/* ci_artifacts/ 2>/dev/null || true
+          find MLProject/mlruns -name "*.png" -exec cp {} ci_artifacts/ \; 2>/dev/null || true
+          ls -lh ci_artifacts/ || echo "Tidak ada artefak lokal"
+
+      # ── 6. Upload artifacts to GitHub ─────────────────
+      - name: Upload Artifacts to GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-artifacts-${{ github.run_number }}
+          path: ci_artifacts/
+          retention-days: 30
+
+      # ── 7. Commit artifacts back to repo ──────────────
+      - name: Commit Artifacts to Repository
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add ci_artifacts/ || true
+          git diff --staged --quiet || \
+            git commit -m "ci: save artifacts from run #${{ github.run_number }}"
+          git push || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 8. Build & Push Docker Image ──────────────────
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker Image with MLflow
+        run: |
+          cd MLProject
+          mlflow models build-docker \
+            --model-uri "models:/HeartDiseaseClassifier/latest" \
+            --name ${{ env.DOCKER_IMAGE }}:latest \
+            --enable-mlserver
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+
+      - name: Push Docker Image to Docker Hub
+        run: |
+          docker push ${{ env.DOCKER_IMAGE }}:latest
+          docker tag  ${{ env.DOCKER_IMAGE }}:latest \
+                      ${{ env.DOCKER_IMAGE }}:run-${{ github.run_number }}
+          docker push ${{ env.DOCKER_IMAGE }}:run-${{ github.run_number }}
+          echo "Docker image berhasil di-push:"
+          echo "  ${{ env.DOCKER_IMAGE }}:latest"
+          echo "  ${{ env.DOCKER_IMAGE }}:run-${{ github.run_number }}"
