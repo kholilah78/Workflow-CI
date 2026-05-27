@@ -73,12 +73,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 8. Login to Docker Hub ────────────────────────
+      # ── 8. Set Up to Docker Hub ────────────────────────
+      - name: Set up Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          sudo chmod 666 /var/run/docker.sock
+
+      # ── 9. Login to Docker Hub ────────────────────────
       - name: Login to Docker Hub
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # ── 9. Build Docker Image ─────────────────────────
+      # ── 10. Build Docker Image ─────────────────────────
       - name: Build Docker Image with MLflow
         run: |
           RUN_ID=$(cat MLProject/last_run_id.txt)
@@ -94,7 +102,7 @@ jobs:
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
 
-      # ── 10. Push Docker Image ─────────────────────────
+      # ── 11. Push Docker Image ─────────────────────────
       - name: Push Docker Image to Docker Hub
         run: |
           docker push kholilah/heart-disease-mlflow:latest
