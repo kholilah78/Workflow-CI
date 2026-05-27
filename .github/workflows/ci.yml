@@ -81,10 +81,11 @@ jobs:
         run: |
           RUN_ID=$(cat MLProject/last_run_id.txt)
           echo "Using Run ID: $RUN_ID"
+          pip install virtualenv
           mlflow models build-docker \
             --model-uri "runs:/$RUN_ID/model" \
             --name kholilah/heart-disease-mlflow:latest \
-            --env-manager virtualenv
+            --env-manager local
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
