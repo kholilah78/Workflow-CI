@@ -7,6 +7,10 @@ on:
       - 'MLProject/**'
   workflow_dispatch:
 
+# Tambahkan ini agar GitHub Actions diizinkan melakukan commit & push kembali ke repo
+permissions:
+  contents: write
+
 jobs:
   train:
     name: Train Model via MLflow Project
@@ -22,6 +26,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12.7'
+          cache: 'pip' # Optimasi: Cache pip agar workflow berikutnya lebih cepat
 
       # ── 3. Install dependencies ───────────────────────
       - name: Install Dependencies
@@ -38,7 +43,7 @@ jobs:
             -P max_depth=0 \
             -P min_samples_split=2 \
             -P min_samples_leaf=1 \
-            --env-manager=local \
+            -P --env-manager=local \
             --experiment-name "Heart_Disease_CI_Pipeline"
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
@@ -67,9 +72,10 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add ci_artifacts/ || true
+          # Memastikan file last_run_id.txt juga ikut ter-commit jika berubah saat training
+          git add MLProject/last_run_id.txt || true 
           git diff --staged --quiet || \
-            git commit -m "ci: save artifacts from run #${{ github.run_number }}"
-          git push || true
+            (git commit -m "ci: save artifacts from run #${{ github.run_number }}" && git push)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -89,13 +95,10 @@ jobs:
         run: |
           RUN_ID=$(cat MLProject/last_run_id.txt)
           echo "Using Run ID: $RUN_ID"
-          export MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }}
-          export MLFLOW_TRACKING_USERNAME=${{ secrets.MLFLOW_TRACKING_USERNAME }}
-          export MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_TRACKING_PASSWORD }}
           mlflow models build-docker \
             --model-uri "runs:/$RUN_ID/model" \
             --name kholilah/heart-disease-mlflow:latest \
-            --env-manager conda
+            --env-manager virtualenv
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
