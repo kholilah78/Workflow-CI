@@ -1,8 +1,5 @@
 """
 modelling.py (MLProject version)
-==================================
-Script training yang digunakan dalam MLflow Project (Kriteria 3).
-
 Author  : Kholilah Nurafifah
 Dataset : Heart Disease UCI
 """
@@ -17,7 +14,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
-import uuid
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -29,35 +25,23 @@ from sklearn.model_selection import cross_val_score
 import warnings
 warnings.filterwarnings('ignore')
 
-
-# ─────────────────────────────────────────────
-# KONFIGURASI
-# ─────────────────────────────────────────────
 TRAIN_PATH      = os.path.join('heart_preprocessing', 'heart_train.csv')
 TEST_PATH       = os.path.join('heart_preprocessing', 'heart_test.csv')
 TARGET_COL      = 'target'
-EXPERIMENT_NAME = 'Heart_Disease_CI_Pipeline_v2'
 ARTIFACTS_DIR   = 'artifacts'
 os.makedirs(ARTIFACTS_DIR, exist_ok=True)
 
 
-# ─────────────────────────────────────────────
-# ARGPARSE — positional args (tanpa --)
-# ─────────────────────────────────────────────
 def parse_args():
-    parser = argparse.ArgumentParser(description='Heart Disease Model Training')
-    parser.add_argument('n_estimators',       type=int,   nargs='?', default=100)
-    parser.add_argument('max_depth',          type=float, nargs='?', default=0,
-                        help='0 berarti None')
-    parser.add_argument('min_samples_split',  type=int,   nargs='?', default=2)
-    parser.add_argument('min_samples_leaf',   type=int,   nargs='?', default=1)
-    parser.add_argument('random_state',       type=int,   nargs='?', default=42)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('n_estimators',      type=int,   nargs='?', default=100)
+    parser.add_argument('max_depth',         type=float, nargs='?', default=0)
+    parser.add_argument('min_samples_split', type=int,   nargs='?', default=2)
+    parser.add_argument('min_samples_leaf',  type=int,   nargs='?', default=1)
+    parser.add_argument('random_state',      type=int,   nargs='?', default=42)
     return parser.parse_args()
 
 
-# ─────────────────────────────────────────────
-# HELPER FUNCTIONS
-# ─────────────────────────────────────────────
 def load_data(train_path, test_path, target_col):
     train_df = pd.read_csv(train_path)
     test_df  = pd.read_csv(test_path)
@@ -113,9 +97,6 @@ def plot_feature_importance(model, feature_names, path):
     plt.close()
 
 
-# ─────────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────────
 def main():
     args = parse_args()
     max_depth = None if args.max_depth == 0 else int(args.max_depth)
@@ -130,13 +111,11 @@ def main():
     )
 
     with mlflow.start_run():
-
-        # Log params
+        # Log params (hindari log yg sudah di-log MLProject)
         mlflow.log_param('min_samples_split', args.min_samples_split)
         mlflow.log_param('min_samples_leaf',  args.min_samples_leaf)
         mlflow.log_param('random_state',      args.random_state)
 
-        # Training
         model = RandomForestClassifier(
             n_estimators      = args.n_estimators,
             max_depth         = max_depth,
@@ -147,7 +126,6 @@ def main():
         )
         model.fit(X_train, y_train)
 
-        # Evaluasi
         y_pred  = model.predict(X_test)
         y_proba = model.predict_proba(X_test)[:, 1]
 
@@ -158,7 +136,6 @@ def main():
         roc_auc   = roc_auc_score(y_test, y_proba)
         cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring='f1')
 
-        # Log metrics
         mlflow.log_metric('accuracy',   acc)
         mlflow.log_metric('precision',  precision)
         mlflow.log_metric('recall',     recall)
@@ -171,10 +148,8 @@ def main():
         print(f"F1-Score : {f1:.4f}")
         print(f"ROC-AUC  : {roc_auc:.4f}")
 
-        # Log model
         mlflow.sklearn.log_model(model, 'model')
 
-        # Artefak tambahan
         cm_path     = os.path.join(ARTIFACTS_DIR, 'confusion_matrix.png')
         roc_path    = os.path.join(ARTIFACTS_DIR, 'roc_curve.png')
         fi_path     = os.path.join(ARTIFACTS_DIR, 'feature_importance.png')
@@ -184,9 +159,8 @@ def main():
         plot_roc_curve(y_test, y_proba, roc_auc, roc_path)
         plot_feature_importance(model, list(X_train.columns), fi_path)
 
-        report = classification_report(
-            y_test, y_pred, target_names=['No Disease', 'Disease']
-        )
+        report = classification_report(y_test, y_pred,
+                                       target_names=['No Disease', 'Disease'])
         with open(report_path, 'w') as f:
             f.write(report)
 
@@ -198,10 +172,11 @@ def main():
         mlflow.set_tag('author',  'Kholilah Nurafifah')
         mlflow.set_tag('dataset', 'Heart Disease UCI')
 
-        # Simpan run_id ke file
+        # Simpan run_id untuk docker build
         run_id = mlflow.active_run().info.run_id
         with open('last_run_id.txt', 'w') as f:
             f.write(run_id)
+
         print(f"\n[MLflow] Run ID: {run_id}")
         print("[CI] Training selesai!")
 

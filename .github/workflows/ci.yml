@@ -7,7 +7,6 @@ on:
       - 'MLProject/**'
   workflow_dispatch:
 
-# Tambahkan ini agar GitHub Actions diizinkan melakukan commit & push kembali ke repo
 permissions:
   contents: write
 
@@ -17,25 +16,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Checkout ─────────────────────────────────
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # ── 2. Setup Python ──────────────────────────────
       - name: Setup Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12.7'
-          cache: 'pip' # Optimasi: Cache pip agar workflow berikutnya lebih cepat
 
-      # ── 3. Install dependencies ───────────────────────
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install mlflow==2.19.0 scikit-learn==1.5.2 \
                       pandas numpy matplotlib seaborn dagshub
 
-      # ── 4. Run MLflow Project ─────────────────────────
       - name: Run MLflow Project
         run: |
           mlflow run MLProject \
@@ -43,22 +37,19 @@ jobs:
             -P max_depth=0 \
             -P min_samples_split=2 \
             -P min_samples_leaf=1 \
-            -P --env-manager=local \
+            --env-manager=local \
             --experiment-name "Heart_Disease_CI_Pipeline"
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
 
-      # ── 5. Collect artifacts ──────────────────────────
       - name: Collect Artifacts
         run: |
           mkdir -p ci_artifacts
           cp -r MLProject/artifacts/* ci_artifacts/ 2>/dev/null || true
-          echo "Artifacts collected:"
           ls -lh ci_artifacts/
 
-      # ── 6. Upload artifacts to GitHub ─────────────────
       - name: Upload Artifacts to GitHub Actions
         uses: actions/upload-artifact@v4
         with:
@@ -66,31 +57,25 @@ jobs:
           path: ci_artifacts/
           retention-days: 30
 
-      # ── 7. Commit artifacts back to repo ──────────────
       - name: Commit Artifacts to Repository
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add ci_artifacts/ || true
-          # Memastikan file last_run_id.txt juga ikut ter-commit jika berubah saat training
-          git add MLProject/last_run_id.txt || true 
+          git add ci_artifacts/ MLProject/last_run_id.txt || true
           git diff --staged --quiet || \
             (git commit -m "ci: save artifacts from run #${{ github.run_number }}" && git push)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 8. Set Up to Docker Hub ────────────────────────
       - name: Set up Docker
         run: |
           sudo chmod 666 /var/run/docker.sock
           docker --version
 
-      # ── 9. Login to Docker Hub ────────────────────────
       - name: Login to Docker Hub
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # ── 10. Build Docker Image ─────────────────────────
       - name: Build Docker Image with MLflow
         run: |
           RUN_ID=$(cat MLProject/last_run_id.txt)
@@ -104,7 +89,6 @@ jobs:
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
 
-      # ── 11. Push Docker Image ─────────────────────────
       - name: Push Docker Image to Docker Hub
         run: |
           docker push kholilah/heart-disease-mlflow:latest
