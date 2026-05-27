@@ -78,6 +78,7 @@ jobs:
         run: |
           sudo chmod 666 /var/run/docker.sock
           docker --version
+
       # ── 9. Login to Docker Hub ────────────────────────
       - name: Login to Docker Hub
         run: |
@@ -93,7 +94,8 @@ jobs:
           export MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_TRACKING_PASSWORD }}
           mlflow models build-docker \
             --model-uri "runs:/$RUN_ID/model" \
-            --name kholilah/heart-disease-mlflow:latest
+            --name kholilah/heart-disease-mlflow:latest \
+            --env-manager conda
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
